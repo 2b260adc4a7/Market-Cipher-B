@@ -1,0 +1,97 @@
+//@version=5
+indicator("MarketCipher B", overlay=false)
+
+Osci = 'Osc'
+StocOrj = input(true, title='Sto RSI')
+alsat = input(true, title='Buy/Sell Dot')
+VWOrj = input(true, title='Vwap')
+mfib = input(true, title='Mfi')
+mfibar = input(true, title='Mfi Bar')
+
+top_dotted_line = input(100, "")
+top_solid_line = input(60, "")
+bottom_dotted_line = input(-55, "")
+bottom_solid_line = input(-60, "")
+mid_dotted_line = input(55, "")
+
+WHITE = #ffffff
+GREEN = #3FFB03
+RED = #FE1000
+BLACK = #000000
+YELLOW = #ffeb3b
+LT_BLUE = #90CAF9
+DK_BLUE  = #0C47A1
+PURPLE = #ca1bffe7
+
+colorWT1 = color.new(LT_BLUE, 0)
+colorWT2 = color.new(DK_BLUE, 10)
+colorWTFast =  color.new(YELLOW, 40)
+green_dot = color.new(GREEN, 0)
+red_dot = color.new(RED, 0)
+colorMFIbuy = color.new(GREEN, 40)
+colorMFIsell = color.new(RED, 40)
+colorObLevel = color.new(WHITE, 60)
+colorOsLevel = color.new(WHITE, 60)
+colorTigLevel1 = color.new(WHITE, 40)
+colorTigLevel2 = color.new(WHITE, 40)
+colorZero = color.new(WHITE, 100)
+mfibarclrb = color.new(GREEN, 70)
+mfibarclrs = color.new(RED, 70)
+colorStochRsiFast = color.new(PURPLE, 0)  
+colorStochRsiSlow1 = color.new(GREEN, 0)
+colorStochRsiSlow2 = color.new(RED, 0)
+
+// Functions
+blueWaves_vwap(src, chlLen, avgLen) =>
+    esa = ta.ema(src, chlLen)
+    d = ta.ema(math.abs(src - esa), chlLen)
+    ci = (src - esa) / (0.015 * d)
+    bw1 = ta.ema(ci, avgLen)
+    bw2 = ta.sma(bw1, 3)
+    vwap = bw1 - bw2
+    wtCross = ta.cross(bw1, bw2)
+    wtCrossUp = bw2 - bw1 <= 0
+    wtCrossDown = bw2 - bw1 >= 0
+    [bw1, bw2, vwap, wtCross, wtCrossUp, wtCrossDown]
+[bw1, bw2, vwap,wtCross, wtCrossUp, wtCrossDown] = blueWaves_vwap(hlc3, 9, 12)
+
+//the holy grail 
+money_flow()=> 
+    m= ta.sma(hlc3,5)
+    f= ta.sma(math.abs(hlc3-m),5)
+    i= (hlc3-m)/(0.015*f)
+    mf=ta.sma(i,60)
+
+//Stochastic
+stoch(src,len,k,tf) =>
+    request.security(ticker.heikinashi(syminfo.tickerid),tf,ta.sma(ta.stoch(close, high, low, len),k))
+
+rsi =stoch(close,40,2,timeframe.period)
+stoch =stoch(close,81,2,timeframe.period)  
+buySignal = wtCross and wtCrossUp
+sellSignal = wtCross and wtCrossDown
+
+// Plots
+plot(bw1, "Lt Blue Wave",colorWT1, style=plot.style_area, linewidth=1)
+plot(bw2, "Blue Wave",colorWT2, style=plot.style_area, linewidth=1)
+plot(VWOrj ? vwap:na, "VWAP",colorWTFast, 1,  style=plot.style_area)
+plot(mfib ? money_flow():na, "Mny Flow", money_flow() > 0 ? colorMFIbuy : colorMFIsell, 2, plot.style_area, trackprice=true)
+
+dot_size = 3
+plot(alsat and buySignal ? bw2: na, "Green dot", green_dot, style=plot.style_circles, linewidth=dot_size)
+plot(alsat and sellSignal ? bw2: na, "Red dot", red_dot, style=plot.style_circles, linewidth=dot_size)
+plot(alsat and buySignal and bw1 < bottom_solid_line ? -93 : na, "Big Green", green_dot, style = plot.style_circles, linewidth = dot_size + 1)
+plot(0, "Zero", colorZero)
+plot(top_dotted_line, "obLevel1", colorObLevel, 1,plot.style_circles)
+plot(bottom_dotted_line, "osLevel1 ", colorOsLevel, 1,plot.style_circles)
+plot(mid_dotted_line , "TrigLevel 0", colorObLevel, 1,plot.style_circles)
+plot(top_solid_line, "TrigLevel 1", colorTigLevel2, 2)
+plot(bottom_solid_line, "TrigLevel 2", colorTigLevel1, 2)
+
+rsi_line_width = 2
+plot(StocOrj ? rsi:na, title='Sto RSI', color=colorStochRsiFast, linewidth=rsi_line_width)
+plot(StocOrj ? stoch:na, title='Sto RSI', color=stoch < rsi ? colorStochRsiSlow1 : colorStochRsiSlow2, linewidth=rsi_line_width)
+p0 = plot(mfibar ? -93:na, "Mfi Bar", color.new(WHITE, 100),editable=false)
+p1 = plot(mfibar ? -103:na, "Mfi Bar", color.new(WHITE, 100),editable=false)
+fill(p0, p1, money_flow() > 0 ? mfibarclrb : mfibarclrs)
+
